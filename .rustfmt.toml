@@ -1,0 +1,16 @@
+imports_granularity = "Module"
+use_small_heuristics = "Max"
+wrap_comments = true
+indent_style = "Visual"
+
+# line width
+max_width = 80
+chain_width = 60
+
+# braces
+brace_style = "PreferSameLine"
+control_brace_style = "AlwaysSameLine"
+
+# macros
+format_macro_matchers = true
+format_macro_bodies = true

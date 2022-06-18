@@ -1,0 +1,21 @@
+[package]
+name = "qrshare-lib"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dev-dependencies]
+hex = "0.4.3"
+
+[dependencies]
+digest = { version = "0.10.3", optional = true }
+blake2 = { version = "0.9.1", optional = true }
+sha2 = { version = "0.10.2", optional = true }
+
+[features]
+b2 = [ "dep:blake2", "dep:digest" ]
+sha2 = [ "dep:sha2", "dep:digest" ]
+
+default = [ "b2", "sha2" ]
