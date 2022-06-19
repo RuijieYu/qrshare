@@ -1,4 +1,6 @@
 ;;; Directory Local Variables
 ;;; For more information see (info "(emacs) Directory Variables")
 
-((rust-mode . ((fill-column . 80))))
+((gfm-mode . ((fill-column . 80)))
+ (markdown-mode . ((mode . gfm)))
+ (rust-mode . ((fill-column . 80))))
