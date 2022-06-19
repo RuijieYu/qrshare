@@ -1,5 +1,6 @@
 /// Generate the QR code from a file
 pub mod gen {
+    use std::fmt::{self, Display, Formatter};
     use std::net::SocketAddr;
     use std::path::PathBuf;
 
@@ -21,8 +22,8 @@ pub mod gen {
         Svg,
     }
 
-    impl std::fmt::Display for QrFileType {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    impl Display for QrFileType {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             match self {
                 QrFileType::Png => write!(f, "png"),
                 QrFileType::Svg => write!(f, "svg"),
@@ -78,10 +79,10 @@ pub mod gen {
 pub mod show {
     use std::path::Path;
 
+    use crate::errors;
+
     /// Show a QR code for the path.  See [`open`] crate for further details.
-    pub async fn qr_show(
-        qr_path: impl AsRef<Path>,
-    ) -> crate::errors::Result<()> {
+    pub async fn qr_show(qr_path: impl AsRef<Path>) -> errors::Result<()> {
         Ok(open::that(qr_path.as_ref().as_os_str())?)
     }
 }

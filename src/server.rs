@@ -16,12 +16,13 @@ use tokio::io::AsyncReadExt;
 use tokio::spawn;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
+use qrshare_lib::errors::{self, Error};
+use qrshare_lib::file::asy;
+use qrshare_lib::qr::gen::{gen_qr, QrFileType};
+use qrshare_lib::qr::show::qr_show;
+use qrshare_lib::utils::{query_split_opt, status};
+
 use crate::cli::Cli;
-use crate::errors::{self, Error};
-use crate::file::asy;
-use crate::qr::gen::{gen_qr, QrFileType};
-use crate::qr::show::qr_show;
-use crate::utils::{query_split_opt, status};
 
 /// The default port to listen
 const DEFAULT_PORT: u16 = 0;

@@ -2,11 +2,11 @@ use std::mem::replace;
 
 use hyper::{Response, StatusCode};
 
-pub(crate) fn query_split(s: &str) -> Vec<(&str, &str)> {
+pub fn query_split(s: &str) -> Vec<(&str, &str)> {
     s.split('&').filter_map(|p| p.split_once('=')).collect()
 }
 
-pub(crate) fn query_split_opt(s: Option<&str>) -> Vec<(&str, &str)> {
+pub fn query_split_opt(s: Option<&str>) -> Vec<(&str, &str)> {
     match s {
         Some(s) => query_split(s),
         None => vec![],
@@ -15,7 +15,7 @@ pub(crate) fn query_split_opt(s: Option<&str>) -> Vec<(&str, &str)> {
 
 /// Swap provided status code and the internal response status code, and return
 /// the swapped values.
-pub(crate) fn swap_status<Body>(
+pub fn swap_status<Body>(
     mut resp: Response<Body>,
     s: StatusCode,
 ) -> (Response<Body>, StatusCode) {
@@ -24,7 +24,7 @@ pub(crate) fn swap_status<Body>(
 }
 
 /// Create a response just from a status code
-pub(crate) fn status<Body>(s: StatusCode) -> Response<Body>
+pub fn status<Body>(s: StatusCode) -> Response<Body>
 where
     Body: From<&'static str>,
 {
