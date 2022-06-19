@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{net::IpAddr, path::PathBuf};
 
 use clap::Parser;
 
@@ -27,7 +27,21 @@ pub struct Cli {
     /// Sets a custom bound address, default is all available addresses.
     /// UNIMPLEMENTED
     #[clap(short, long, value_parser)]
-    pub bind: Option<String>,
+    pub bind: Option<IpAddr>,
+
+    /// Use PNG format when generating the QR code.  This is the default.
+    /// Conflicts with `--svg`.  Ignored when `--no-qrcode` is set.
+    #[clap(long, value_parser)]
+    pub png: Option<bool>,
+
+    /// Use SVG format when generating the QR code.  Conflicts with `--png`, and
+    /// is ignored when `--no-qrcode` is set.
+    #[clap(long, value_parser)]
+    pub svg: Option<bool>,
+
+    /// Do not show the QR code.  Overrides `--svg` and `--png`.
+    #[clap(short = 'Q', long, value_parser)]
+    pub no_qrcode: Option<bool>,
 
     /// The paths of files to serve.  There should be at least one file to
     /// serve.

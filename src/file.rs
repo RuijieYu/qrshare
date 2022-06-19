@@ -24,6 +24,7 @@ pub mod shared {
 }
 
 /// Synchronous API
+#[allow(dead_code)]
 pub mod sync {
     pub use std::fs::{canonicalize, File};
 
@@ -38,6 +39,7 @@ pub mod sync {
 }
 
 /// Asynchronous API
+#[allow(dead_code)]
 pub mod asy {
     pub use tokio::fs::{canonicalize, File};
 
@@ -54,6 +56,7 @@ pub mod asy {
 
 /// An API that supports either an synchronous implementation ([`std::fs`]) or
 /// an asynchronous implementation ([`tokio::fs`]).
+#[allow(dead_code)]
 pub mod either_sync {
     /// An "either" file is either a synchronous file or an asynchronous file.
     pub type File = either::Either<std::fs::File, tokio::fs::File>;
