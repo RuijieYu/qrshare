@@ -1,19 +1,21 @@
 /// Generate the QR code from a file
 pub mod gen {
-    use std::fmt::{self, Display, Formatter};
-    use std::net::SocketAddr;
-    use std::path::PathBuf;
+    use std::{
+        fmt::{self, Display, Formatter},
+        net::SocketAddr,
+        path::PathBuf,
+    };
 
     use http::Uri;
     use image::Luma;
-    use qrcode::render::svg;
-    use qrcode::QrCode;
+    use qrcode::{render::svg, QrCode};
     use tempfile::TempDir;
-    use tokio::fs::File;
-    use tokio::io::AsyncWriteExt;
+    use tokio::{fs::File, io::AsyncWriteExt};
 
-    use crate::errors;
-    use crate::net::{get_first_net, is_global_4};
+    use crate::{
+        errors,
+        net::{get_first_net, is_global_4},
+    };
 
     /// Which file type to render.
     #[derive(Debug, Clone, Copy)]

@@ -1,26 +1,32 @@
-use std::cmp::min;
-use std::collections::{HashMap, HashSet};
-use std::convert::Infallible;
-use std::fmt::Debug;
-use std::net::{IpAddr, SocketAddr};
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::{
+    cmp::min,
+    collections::{HashMap, HashSet},
+    convert::Infallible,
+    fmt::Debug,
+    net::{IpAddr, SocketAddr},
+    path::PathBuf,
+    sync::Arc,
+};
 
-use hyper::server::conn::AddrStream;
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Method, Request, Response, StatusCode};
+use hyper::{
+    server::conn::AddrStream,
+    service::{make_service_fn, service_fn},
+    Body, Method, Request, Response, StatusCode,
+};
 use sha2::{Digest, Sha512};
 use tempfile::tempdir;
-use tokio::fs::File;
-use tokio::io::AsyncReadExt;
-use tokio::spawn;
+use tokio::{fs::File, io::AsyncReadExt, spawn};
 use tokio_util::codec::{BytesCodec, FramedRead};
 
-use qrshare_lib::errors::{self, Error};
-use qrshare_lib::file::asy;
-use qrshare_lib::qr::gen::{gen_qr, QrFileType};
-use qrshare_lib::qr::show::qr_show;
-use qrshare_lib::utils::{query_split_opt, status};
+use qrshare_lib::{
+    errors::{self, Error},
+    file::asy,
+    qr::{
+        gen::{gen_qr, QrFileType},
+        show::qr_show,
+    },
+    utils::{query_split_opt, status},
+};
 
 use crate::cli::Cli;
 

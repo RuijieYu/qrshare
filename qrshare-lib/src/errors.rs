@@ -1,6 +1,4 @@
-use core::fmt;
-use std::io;
-use std::path::PathBuf;
+use std::{fmt, io, path::PathBuf};
 
 #[non_exhaustive]
 #[derive(Debug)]

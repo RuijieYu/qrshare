@@ -4,8 +4,7 @@ mod server;
 use clap::Parser;
 use qrshare_lib::errors;
 
-use crate::cli::Cli;
-use crate::server::Server;
+use crate::{cli::Cli, server::Server};
 
 #[tokio::main]
 async fn main() -> errors::Result<()> {
