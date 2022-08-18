@@ -28,7 +28,7 @@ use qrshare_lib::{
     utils::{query_split_opt, status},
 };
 
-use crate::cli::Cli;
+use crate::cli::{Cli, ImageOptions};
 
 /// The default port to listen
 const DEFAULT_PORT: u16 = 0;
@@ -62,17 +62,11 @@ impl Server {
         let bind = cli.bind;
         let digest = Default::default();
 
-        // QR code filetype validation and processing
-        let qr = match (cli.no_qrcode, cli.png, cli.svg) {
-            // QR disabled
-            (Some(true), _, _) => Ok(None),
-            // conflict
-            (_, Some(true), Some(true)) => Err(errors::Error::ArgConflict),
-            // SVG
-            (_, _, Some(true)) => Ok(Some(QrFileType::Svg)),
-            // PNG
-            _ => Ok(Some(QrFileType::Png)),
-        }?;
+        let qr = match cli.image {
+            ImageOptions::Png => Some(QrFileType::Png),
+            ImageOptions::Svg => Some(QrFileType::Svg),
+            ImageOptions::None => None,
+        };
 
         // Canonicalize paths, and deduplicate the collection -- raise a warning
         // and continue when not in strict mode, and exit when in strict mode.

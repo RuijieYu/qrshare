@@ -1,15 +1,23 @@
 use std::{net::IpAddr, path::PathBuf};
 
-use clap::Parser;
-
 /// A [`Cli`] is the collection of all options configurable from the
 /// command-line arguments.
-#[derive(Parser, Debug, Clone)]
+#[derive(clap::Parser, Debug, Clone)]
 #[clap(name = "QR Share")]
 #[clap(version = "0.1.0")]
 #[clap(author = "Ruijie Yu <ruijie@netyu.xyz>")]
 #[clap(about = "qrshare")]
 pub struct Cli {
+    /// Debug use, print self after parsing.
+    #[cfg(debug_assertions)]
+    #[clap(long, value_parser)]
+    debug: bool,
+
+    /// Image options.  Use PNG format or SVG format to produce the QR code, or
+    /// skip producing the QR code at all.
+    #[clap(short = 'I', long, arg_enum, default_value = "png")]
+    pub image: ImageOptions,
+
     /// Quiet operation.  Do not warn about missing files.
     #[clap(short, long, value_parser)]
     pub quiet: Option<bool>,
@@ -29,22 +37,44 @@ pub struct Cli {
     #[clap(short, long, value_parser)]
     pub bind: Option<IpAddr>,
 
-    /// Use PNG format when generating the QR code.  This is the default.
-    /// Conflicts with `--svg`.  Ignored when `--no-qrcode` is set.
-    #[clap(long, value_parser)]
-    pub png: Option<bool>,
-
-    /// Use SVG format when generating the QR code.  Conflicts with `--png`, and
-    /// is ignored when `--no-qrcode` is set.
-    #[clap(long, value_parser)]
-    pub svg: Option<bool>,
-
-    /// Do not show the QR code.  Overrides `--svg` and `--png`.
-    #[clap(short = 'Q', long, value_parser)]
-    pub no_qrcode: Option<bool>,
-
     /// The paths of files to serve.  There should be at least one file to
     /// serve.
     #[clap(value_parser)]
     pub files: Vec<PathBuf>,
+}
+
+impl Cli {
+    #[cfg(debug_assertions)]
+    #[inline]
+    pub fn parse() -> Self {
+        let this = <Self as clap::Parser>::parse();
+        if this.debug {
+            eprintln!("{:#?}", this);
+            std::process::exit(0)
+        } else {
+            this
+        }
+    }
+    #[cfg(not(debug_assertions))]
+    #[inline]
+    pub fn parse() -> Self {
+        <Self as clap::Parser>::parse()
+    }
+}
+
+#[derive(clap::ArgEnum, Debug, Clone)]
+pub enum ImageOptions {
+    Png,
+    Svg,
+    None,
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::IntoApp;
+
+    #[test]
+    fn test_cli() {
+        super::Cli::command().debug_assert()
+    }
 }

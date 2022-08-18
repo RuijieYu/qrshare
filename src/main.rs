@@ -1,7 +1,6 @@
 mod cli;
 mod server;
 
-use clap::Parser;
 use qrshare_lib::errors;
 
 use crate::{cli::Cli, server::Server};
