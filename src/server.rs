@@ -1,9 +1,8 @@
 use std::{
-    cmp::min,
     collections::{HashMap, HashSet},
     convert::Infallible,
     fmt::Debug,
-    net::{IpAddr, SocketAddr},
+    net::SocketAddr,
     path::PathBuf,
     sync::Arc,
 };
@@ -28,10 +27,7 @@ use qrshare_lib::{
     utils::{query_split_opt, status},
 };
 
-use crate::cli::{Cli, ImageOptions};
-
-/// The default port to listen
-const DEFAULT_PORT: u16 = 0;
+use crate::cli::{BindOptions, Cli, ImageOptions};
 
 /// The default buffer size, in bytes
 const DEFAULT_BUFSIZE: usize = 1024;
@@ -39,10 +35,8 @@ const DEFAULT_BUFSIZE: usize = 1024;
 /// A [`Server`] is the server object.
 #[derive(Debug)]
 pub struct Server {
-    /// The parsed port
-    pub port: u16,
-    /// The bound address
-    pub bind: Option<IpAddr>,
+    /// The bind options
+    pub bind: BindOptions,
     /// The set of paths of files to serve.  This assumes that directory
     /// structure does not change.
     pub files: HashSet<PathBuf>,
@@ -58,9 +52,8 @@ impl Server {
     /// In particular, the collection of files is canonicalized, deduplicated,
     /// and ensured to reference valid files.
     pub async fn new(cli: Cli) -> errors::Result<Self> {
-        let port = cli.port.unwrap_or(DEFAULT_PORT);
         let bind = cli.bind;
-        let digest = Default::default();
+        let digest = HashMap::default();
 
         let qr = match cli.image {
             ImageOptions::Png => Some(QrFileType::Png),
@@ -80,7 +73,7 @@ impl Server {
                         files.insert(path);
                     }
                     // when strict + no canonical path, return
-                    (Some(true), _, Err(_)) => Err(Error::InvalidFile(p))?,
+                    (true, _, Err(_)) => Err(Error::InvalidFile(p))?,
                     // when not strict + no canonical path + quiet, skip
                     (_, Some(true), Err(_)) => (),
                     // when not strict + no canonical path + not quiet, warn
@@ -94,7 +87,7 @@ impl Server {
         if files.is_empty() {
             Err(Error::NoFiles)
         } else {
-            Ok(Self { port, bind, files, digest, qr })
+            Ok(Self { bind, files, digest, qr })
         }
     }
 
@@ -106,15 +99,14 @@ impl Server {
                     let mut digest = Sha512::new();
                     let digest: Vec<u8> = loop {
                         // hold the entirety of file data
-                        let mut buf = [Default::default(); DEFAULT_BUFSIZE];
+                        let mut buf = [0; DEFAULT_BUFSIZE];
                         // update digest for the newly read data
                         match file.read(&mut buf).await {
                             // EOF
                             Ok(0) => break digest.finalize(),
                             // .read() *may* return a larger sz than capacity
-                            Ok(sz) => {
-                                digest.update(&buf[0..min(sz, buf.len())])
-                            }
+                            Ok(sz) => digest
+                                .update(&buf[0..usize::min(sz, buf.len())]),
                             Err(_) => break digest.finalize(),
                         }
                     }
@@ -132,14 +124,18 @@ impl Server {
 
     /// Internal request handler.  The argument `query` is an iterable struct of
     /// pairs (such as vec of `&str` pair, or a map from `&str` to `&str`).
-    async fn handle_request<'q>(
-        server: &Self,
-        query: impl IntoIterator<Item = (&'q str, &'q str)>,
+    async fn handle_request(
+        self: Arc<Self>,
+        query: impl IntoIterator<Item = (&str, &str)>,
     ) -> errors::Result<Response<Body>> {
-        let query: HashMap<_, _> = query.into_iter().collect();
-        let path = query
-            .get("h")
-            .map(|hash| server.digest.get(hash.to_owned()));
+        self.__handle_request(query.into_iter().collect()).await
+    }
+
+    async fn __handle_request(
+        self: Arc<Self>,
+        query: HashMap<&str, &str>,
+    ) -> errors::Result<Response<Body>> {
+        let path = query.get("h").map(|hash| self.digest.get(hash.to_owned()));
 
         Ok(match path {
             Some(Some(path)) => {
@@ -155,8 +151,6 @@ impl Server {
                             ),
                         )
                         .body(body)?
-
-                    // Response::new(body)
                 } else {
                     status(StatusCode::NOT_FOUND)
                 }
@@ -170,17 +164,15 @@ impl Server {
 
     /// Request handler.
     async fn handle(
-        server: impl AsRef<Self>,
+        self: Arc<Self>,
         _addr: SocketAddr,
         req: Request<Body>,
     ) -> Result<Response<Body>, Infallible> {
-        let server = server.as_ref();
-
         let resp = match (req.method(), req.uri().path(), req.uri().query()) {
             // ref:
             // https://github.com/hyperium/hyper/blob/master/examples/send_file.rs
             (&Method::GET, "/sha512" | "/sha512/", query) => {
-                Self::handle_request(server, query_split_opt(query)).await
+                self.handle_request(query_split_opt(query)).await
             }
             // usually a browser will ask for /favicon.ico -- this is usually
             // not available
@@ -196,7 +188,7 @@ impl Server {
     /// Start serving the specified files.
     pub(super) async fn start(self) -> errors::Result<()> {
         // XXX: currently the program binds to 0.0.0.0:port
-        let addr = SocketAddr::from(([0; 4], self.port));
+        let addr = SocketAddr::from(([0; 4], self.bind.port));
         let server = spawn(self.prepare_digest());
         let server = server.await?;
 
@@ -208,9 +200,8 @@ impl Server {
             make_service_fn(move |conn: &AddrStream| {
                 let server = server.clone();
                 let addr = conn.remote_addr();
-                let service = service_fn(move |req| {
-                    Self::handle(server.clone(), addr, req)
-                });
+                let service =
+                    service_fn(move |req| server.clone().handle(addr, req));
                 async move { Ok::<_, Infallible>(service) }
             }),
         );
@@ -232,8 +223,7 @@ impl Server {
             let digest = server
                 .digest
                 .iter()
-                // XXX: waiting for bool::then_some(val) to come to stable
-                .find_map(|(key, val)| (val == file).then(move || key))
+                .find_map(|(key, val)| (val == file).then_some(key))
                 .expect("The digest for this file should have been generated");
 
             let dir = tempdir()?;
