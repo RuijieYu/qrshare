@@ -1,9 +1,8 @@
 mod cli;
 mod server;
 
-use qrshare_lib::errors;
-
 use crate::{cli::Cli, server::Server};
+use lib::errors;
 
 #[tokio::main]
 async fn main() -> errors::Result<()> {

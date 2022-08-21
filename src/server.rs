@@ -17,7 +17,8 @@ use tempfile::tempdir;
 use tokio::{fs::File, io::AsyncReadExt, spawn};
 use tokio_util::codec::{BytesCodec, FramedRead};
 
-use qrshare_lib::{
+use crate::cli::{BindOptions, Cli, ImageOptions};
+use lib::{
     errors::{self, Error},
     file::asy,
     qr::{
@@ -26,8 +27,6 @@ use qrshare_lib::{
     },
     utils::{query_split_opt, status},
 };
-
-use crate::cli::{BindOptions, Cli, ImageOptions};
 
 /// The default buffer size, in bytes
 const DEFAULT_BUFSIZE: usize = 1024;
