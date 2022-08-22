@@ -1,4 +1,6 @@
-use std::{net::IpAddr, path::PathBuf};
+use std::path::PathBuf;
+
+use lib::config::Config;
 
 /// A [`Cli`] is the collection of all options configurable from the
 /// command-line arguments.
@@ -13,23 +15,9 @@ pub struct Cli {
     #[clap(long, value_parser)]
     debug_print: bool,
 
-    /// Image options.  Use PNG format or SVG format to produce the QR code, or
-    /// skip producing the QR code at all.
-    #[clap(short = 'I', long, value_enum, default_value = "png")]
-    pub image: ImageOptions,
-
-    /// Quiet operation.  Do not warn about missing files.
-    #[clap(short, long, value_parser)]
-    pub quiet: Option<bool>,
-
-    /// Strict mode.  When enabled, the server exits on any failure in path
-    /// resolution and IO.
-    #[clap(short, long, value_parser)]
-    pub strict: bool,
-
-    /// Bind options, containing the bound host(s) and port.
+    /// General configurations.  May come from configuration file.
     #[clap(flatten)]
-    pub bind: BindOptions,
+    pub config: Config,
 
     /// The paths of files to serve.  There should be at least one file to
     /// serve.
@@ -45,36 +33,14 @@ impl Cli {
         if this.debug_print {
             eprintln!("{:#?}", this);
             std::process::exit(0)
-        } else {
-            this
         }
+        this
     }
     #[cfg(not(debug_assertions))]
     #[inline]
     pub fn parse() -> Self {
         <Self as clap::Parser>::parse()
     }
-}
-
-#[derive(clap::ValueEnum, Debug, Clone)]
-pub enum ImageOptions {
-    Png,
-    Svg,
-    None,
-}
-
-/// Options for interface binding.
-#[derive(clap::Args, Debug, Clone)]
-pub struct BindOptions {
-    /// Sets a custom bound host address, default is all available addresses.
-    /// UNIMPLEMENTED
-    #[clap(short = 'H', long, value_parser)]
-    pub host: Vec<IpAddr>,
-
-    /// Sets a custom port.  Default to 0, where an arbitrary available port is
-    /// used.
-    #[clap(short, long, value_parser, default_value = "0")]
-    pub port: u16,
 }
 
 #[cfg(test)]

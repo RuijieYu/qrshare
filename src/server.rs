@@ -17,8 +17,9 @@ use tempfile::tempdir;
 use tokio::{fs::File, io::AsyncReadExt, spawn};
 use tokio_util::codec::{BytesCodec, FramedRead};
 
-use crate::cli::{BindOptions, Cli, ImageOptions};
+use crate::cli::Cli;
 use lib::{
+    config::{BindOptions, ImageOptions},
     errors::{self, Error},
     file::asy,
     qr::{
@@ -51,14 +52,14 @@ impl Server {
     /// In particular, the collection of files is canonicalized, deduplicated,
     /// and ensured to reference valid files.
     pub async fn new(cli: Cli) -> errors::Result<Self> {
-        let bind = cli.bind;
-        let digest = HashMap::default();
-
-        let qr = match cli.image {
+        let qr = match cli.config.image() {
             ImageOptions::Png => Some(QrFileType::Png),
             ImageOptions::Svg => Some(QrFileType::Svg),
             ImageOptions::None => None,
         };
+
+        let bind = cli.config.bind;
+        let digest = HashMap::default();
 
         // Canonicalize paths, and deduplicate the collection -- raise a warning
         // and continue when not in strict mode, and exit when in strict mode.
@@ -66,13 +67,13 @@ impl Server {
             let mut files = HashSet::with_capacity(cli.files.len());
             for p in cli.files {
                 let path = asy::canonicalize(&p).await;
-                match (cli.strict, cli.quiet, path) {
+                match (cli.config.strict, cli.config.quiet, path) {
                     // when got a canonicalized path, insert
                     (_, _, Ok(path)) => {
                         files.insert(path);
                     }
                     // when strict + no canonical path, return
-                    (true, _, Err(_)) => Err(Error::InvalidFile(p))?,
+                    (Some(true), _, Err(_)) => Err(Error::InvalidFile(p))?,
                     // when not strict + no canonical path + quiet, skip
                     (_, Some(true), Err(_)) => (),
                     // when not strict + no canonical path + not quiet, warn
@@ -187,7 +188,7 @@ impl Server {
     /// Start serving the specified files.
     pub(super) async fn start(self) -> errors::Result<()> {
         // XXX: currently the program binds to 0.0.0.0:port
-        let addr = SocketAddr::from(([0; 4], self.bind.port));
+        let addr = SocketAddr::from(([0; 4], self.bind.port()));
         let server = spawn(self.prepare_digest());
         let server = server.await?;
 
