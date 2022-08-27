@@ -1,14 +1,23 @@
 //! This module contains configuration and command-line interface
 //! functionalities.
 
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::{
+    fmt::{self, Display, Formatter},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+};
 
-use crate::{default, unwrap_getter};
+use either::Either;
+
+use crate::{
+    default,
+    net::{get_first_net, is_global_4},
+    unwrap_getter,
+};
 
 /// The configuration structure.  Should be able to be extracted from one or
 /// more configuration files.
 #[derive(Debug, Clone, clap::Args, serde::Deserialize, merge::Merge)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct Config {
     /// Image options.  Use PNG format or SVG format to produce the QR code, or
     /// skip producing the QR code at all.
@@ -41,7 +50,7 @@ unwrap_getter!(Config::image: ImageOptions);
 
 /// Allowed image formats.
 #[derive(Debug, Clone, Copy, serde::Deserialize, clap::ValueEnum)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub enum ImageOptions {
     Png,
     Svg,
@@ -49,9 +58,16 @@ pub enum ImageOptions {
 }
 default!(ImageOptions = Self::Png);
 
+impl Display for ImageOptions {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        use clap::ValueEnum;
+        f.write_str(self.to_possible_value().unwrap().get_name())
+    }
+}
+
 /// Options for interface bindings.
 #[derive(Debug, Clone, serde::Deserialize, clap::Args, merge::Merge)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct BindOptions {
     /// Sets custom bound host addresses, default is all available addresses.
     /// UNIMPLEMENTED
@@ -76,6 +92,31 @@ default!(
     }
 );
 unwrap_getter!(BindOptions::port: u16 = 0);
+
+impl BindOptions {
+    pub fn hosts_iter(&self) -> impl Iterator<Item = IpAddr> {
+        if self.hosts.is_empty() {
+            Either::Right(
+                [
+                    IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+                    IpAddr::V6(Ipv6Addr::UNSPECIFIED),
+                ]
+                .into_iter(),
+            )
+        } else {
+            Either::Left(self.hosts.clone().into_iter())
+        }
+    }
+
+    pub fn primary_host(&self) -> IpAddr {
+        if self.hosts.is_empty() {
+            get_first_net(is_global_4)
+                .unwrap_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED))
+        } else {
+            self.hosts[0]
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

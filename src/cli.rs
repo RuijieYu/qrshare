@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use lib::config::Config;
+use log::Level;
 
 /// A [`Cli`] is the collection of all options configurable from the
 /// command-line arguments.
@@ -15,7 +16,7 @@ pub struct Cli {
     #[clap(long, value_parser)]
     debug_print: bool,
 
-    /// General configurations.  May come from configuration file.
+    /// General configurations, which may come from a configuration file.
     #[clap(flatten)]
     pub config: Config,
 
@@ -23,6 +24,10 @@ pub struct Cli {
     /// serve.
     #[clap(value_parser)]
     pub files: Vec<PathBuf>,
+
+    /// The log level to use.
+    #[clap(short = 'L', long, value_parser, default_value_t = Level::Warn)]
+    pub log_level: Level,
 }
 
 impl Cli {

@@ -2,6 +2,7 @@
 pub mod gen {
     use std::{
         fmt::{self, Display, Formatter},
+        io::ErrorKind,
         net::SocketAddr,
         path::PathBuf,
     };
@@ -13,9 +14,12 @@ pub mod gen {
     use tokio::{fs::File, io::AsyncWriteExt};
 
     use crate::{
+        config::ImageOptions,
         errors,
         net::{get_first_net, is_global_4},
     };
+
+    pub use self::svg::Color as SvgColor;
 
     /// Which file type to render.
     #[derive(Debug, Clone, Copy)]
@@ -42,9 +46,9 @@ pub mod gen {
         digest: &str,
         method: &str, // sha512
         scheme: &str, // http
-        ft: QrFileType,
+        ft: ImageOptions,
         dir: &'dir TempDir,
-    ) -> errors::Result<&'dir PathBuf> {
+    ) -> errors::Result<PathBuf> {
         let host = addr.ip();
         let host = if is_global_4(&host) {
             host
@@ -56,16 +60,18 @@ pub mod gen {
         // construct and validate URL
         let url =
             format!("{}://{}:{}/{}/?h={}", scheme, host, port, method, digest);
-        let _ = url
-            .parse::<Uri>()
-            .map_err(|_| errors::Error::Uri(url.clone()))?;
+        let _: Uri =
+            url.parse().map_err(|_| errors::Error::Uri(url.clone()))?;
 
         let path = dir.path().join(format!("{}_{}.{}", method, "qrshare", ft));
 
-        let qr = QrCode::new(url.as_bytes())?;
+        let qr = QrCode::new(url)?;
         match ft {
-            QrFileType::Png => qr.render::<Luma<u8>>().build().save(&path)?,
-            QrFileType::Svg => {
+            ImageOptions::None => {
+                return Err(errors::Error::IO(ErrorKind::Other))
+            }
+            ImageOptions::Png => qr.render::<Luma<u8>>().build().save(&path)?,
+            ImageOptions::Svg => {
                 let mut file = File::create(&path).await?;
                 file.write_all(qr.render::<svg::Color>().build().as_bytes())
                     .await?;
@@ -73,7 +79,7 @@ pub mod gen {
             }
         };
 
-        Ok(Box::leak(Box::new(path)))
+        Ok(path)
     }
 }
 
