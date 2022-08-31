@@ -69,10 +69,10 @@ impl Display for ImageOptions {
 #[derive(Debug, Clone, serde::Deserialize, clap::Args, merge::Merge)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct BindOptions {
-    /// Sets custom bound host addresses, default is all available addresses.
-    /// UNIMPLEMENTED
+    /// Sets custom bound host addresses.  When empty, use all available IPv4
+    /// and IPv6 addresses.
     #[clap(short = 'H', long, value_parser)]
-    #[serde()]
+    #[serde(default = "BindOptions::default_hosts")]
     #[merge(strategy = merge::vec::overwrite_empty)]
     pub hosts: Vec<IpAddr>,
 
@@ -82,27 +82,21 @@ pub struct BindOptions {
     pub port: Option<u16>,
 }
 
-default!(
-    !BindOptions = Self {
-        hosts: vec![
-            IpAddr::V4(Ipv4Addr::UNSPECIFIED),
-            IpAddr::V6(Ipv6Addr::UNSPECIFIED),
-        ],
-        port: None
-    }
-);
+default!(!BindOptions = Self { hosts: Self::default_hosts(), port: None });
 unwrap_getter!(BindOptions::port: u16 = 0);
 
 impl BindOptions {
+    pub const UNSPECIFIED_HOSTS: [IpAddr; 2] =
+        [IpAddr::V4(Ipv4Addr::UNSPECIFIED), IpAddr::V6(Ipv6Addr::UNSPECIFIED)];
+
+    #[inline]
+    pub(crate) fn default_hosts() -> Vec<IpAddr> {
+        BindOptions::UNSPECIFIED_HOSTS.into()
+    }
+
     pub fn hosts_iter(&self) -> impl Iterator<Item = IpAddr> {
         if self.hosts.is_empty() {
-            Either::Right(
-                [
-                    IpAddr::V4(Ipv4Addr::UNSPECIFIED),
-                    IpAddr::V6(Ipv6Addr::UNSPECIFIED),
-                ]
-                .into_iter(),
-            )
+            Either::Right(Self::UNSPECIFIED_HOSTS.into_iter())
         } else {
             Either::Left(self.hosts.clone().into_iter())
         }
@@ -110,8 +104,7 @@ impl BindOptions {
 
     pub fn primary_host(&self) -> IpAddr {
         if self.hosts.is_empty() {
-            get_first_net(is_global_4)
-                .unwrap_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED))
+            get_first_net(is_global_4).unwrap_or(Self::UNSPECIFIED_HOSTS[0])
         } else {
             self.hosts[0]
         }
@@ -131,7 +124,7 @@ mod tests {
 
         let config: Config = toml::toml! {
             [bind]
-                host = ["1.2.3.4", "5.6.7.8", "::"]
+                hosts = ["1.2.3.4", "5.6.7.8", "::"]
         }
         .try_into()
         .unwrap();

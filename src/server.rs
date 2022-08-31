@@ -6,8 +6,11 @@ use std::{
     sync::Arc,
 };
 
-use actix_service::ServiceFactory;
-use actix_web::{dev::ServiceRequest, web::Data, App, HttpServer};
+use actix_web::{
+    middleware::{Compress, Logger},
+    web::{to, Data},
+    App, HttpServer,
+};
 use either::Either;
 use futures::stream::FuturesUnordered;
 use sha2::{Digest, Sha512};
@@ -15,7 +18,7 @@ use tokio::{io::AsyncReadExt, sync::RwLock, task::spawn};
 
 use crate::{
     cli::Cli,
-    services::{favicon, list_files_noext, show_qr},
+    services::{default_service, enqueue_file, favicon, show_qr},
 };
 use lib::{
     config::{BindOptions, ImageOptions},
@@ -107,10 +110,7 @@ impl Server {
 
     /// Process all queued files.  This method will acquire a write lock on
     /// `files`, and also a write lock on `digest`.  When this function returns,
-    /// the queue will become emtpy.  If `skip_existing` is true, then skip a
-    /// path when the entry already exists in the digest database.
-    ///
-    /// TODO: actually implement `skip_existing`
+    /// the queue will become emtpy.
     pub async fn process_digest(self: Arc<Self>) -> errors::Result<()> {
         let futs = FuturesUnordered::new();
         while let Some(path) = self.files.write().await.pop_front() {
@@ -182,7 +182,7 @@ impl Server {
     }
 
     /// Construct the QR code URL for a given file path (left) or digest
-    /// (right).  The URL format is "/qr/{method}/h?{hash}".
+    /// (right).  The URL format is "/qr/{method}/?h={hash}".
     pub async fn qr_url(
         &self,
         file: Either<String, PathBuf>,
@@ -198,26 +198,6 @@ impl Server {
                 Either::Right(path) => self.query_digest(path).await?,
             }
         ))
-    }
-
-    /// Server builder function for [`actix_web`].
-    fn http_builder<T>(server: Data<Self>, app: App<T>) -> App<T>
-    where
-        T: ServiceFactory<
-            ServiceRequest,
-            Config = (),
-            Error = actix_web::Error,
-            InitError = (),
-        >,
-    {
-        app.app_data(server)
-            // main services
-            .service(get_sha512)
-            .service(list_files)
-            .service(favicon)
-            .service(show_qr)
-            // redirect (alias) services
-            .service(list_files_noext)
     }
 
     /// The entry point to start the file server with [`actix_web`].
@@ -237,7 +217,20 @@ impl Server {
         // create the HTTP server
         let http_server = {
             let mut http_server = HttpServer::new(move || {
-                Self::http_builder(Data::clone(&this), App::new())
+                App::new()
+                    // middlewares: compression, logging, etc.
+                    .wrap(Compress::default())
+                    .wrap(Logger::new("%a %r => %s @%Dms"))
+                    // embed server state
+                    .app_data(this.clone())
+                    // main services
+                    .service(get_sha512)
+                    .service(list_files)
+                    .service(favicon)
+                    .service(show_qr)
+                    .service(enqueue_file)
+                    // redirect (alias) services
+                    .default_service(to(default_service))
             });
             for listen in listen {
                 http_server = http_server.listen(listen)?

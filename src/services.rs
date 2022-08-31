@@ -56,8 +56,8 @@ async fn get_sha512(
     inner::do_get_sha512(query, server).await
 }
 
-#[get("/list")]
-async fn list_files_noext() -> impl Responder {
+/// Default service: list all available files.  See also [`list_files`].
+pub async fn default_service() -> impl Responder {
     log::trace!("list_files_noext()");
     HttpResponse::PermanentRedirect()
         .append_header(("Location", "/list.html"))
@@ -73,13 +73,17 @@ async fn list_files(server: Data<Server>) -> errors::Result<impl Responder> {
 
 /// Whether we should forbid remote file enqueuing.  Forbidding remote file
 /// enqueuing *should* still allow "local" (127.0.0.1, ::1) connections to
-/// enqueue the files?  This probably needs more thoughts.  TODO
-const FORBID_REMOTE_ENQUEUE: bool = true;
+/// enqueue the files?  Or maybe just add HTTP authentication and call it good.
+///
+/// This probably needs more thoughts.  TODO
+const FORBID_REMOTE_ENQUEUE: bool = !cfg!(feature = "insecure");
 
 /// # SECURITY NOTE
 ///
 /// Care must be taken here.  By allowing this API, we are essentially allowing
 /// a remote user to retrieve all files accessible to the current user.
+///
+/// For now, this is only allowed with feature "insecure".
 #[post("/serve")]
 #[inline]
 async fn enqueue_file(
@@ -141,14 +145,13 @@ mod inner {
     use lib::errors;
 
     pub(super) async fn do_get_sha512(
-        Query(query): Query<GetQuery>,
+        Query(GetQuery { digest: d }): Query<GetQuery>,
         server: Data<Server>,
     ) -> errors::Result<impl Responder> {
         log::trace!("/sha512");
-        let query = query.digest;
         let path = {
             let digest = server.digest.read().await;
-            digest.get(&query).ok_or(StatusCode::NOT_FOUND)?.to_owned()
+            digest.get(&d).ok_or(StatusCode::NOT_FOUND)?.to_owned()
         };
 
         let filename = path
@@ -193,8 +196,8 @@ mod inner {
         );
 
         // only first 10 chars are important
-        const HASH_KEEP_CHARS: usize = 10;
-        let digest = digest[..HASH_KEEP_CHARS].to_string();
+        const HASH_SHOW_CHARS: usize = 10;
+        let digest = digest[..HASH_SHOW_CHARS].to_string();
 
         Some([digest, download, qr])
     }
@@ -246,7 +249,7 @@ mod inner {
         server.enqueue(files).await;
         Arc::clone(&server).process_digest().await?;
 
-        Ok("Files enqueued")
+        Ok("Files successfully enqueued.\n")
     }
 
     /// Serve a file at `path` as a response, or 404 status if failed.
